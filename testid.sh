@@ -8,6 +8,7 @@ tests_failed=0
 #	- Takes 1 arg: expected number of ids
 verify_genid_output() {
 	expected_num_ids=$1
+	duration_ms=$2
 
 	# Sort output.txt and pipe into sorted.txt
 	sort output.txt > sorted.txt
@@ -26,93 +27,47 @@ verify_genid_output() {
 	# Compare output.txt to expected.txt
 	comm -3 expected.txt sorted.txt > mismatch.txt
 	if [[ -s mismatch.txt ]]; then
-		echo " - FAIL"
+		echo "    [FAIL]"
 		cat mismatch.txt
-		((tests_failed++))
+        tests_failed=$((tests_failed + 1))
 	else
-		echo " - PASS"
-		((tests_passed++))
+        if [[ $duration_ms -eq 0 ]]; then
+            rate="N/A (duration 0)"
+        else
+            rate=$((expected_num_ids * 1000 / duration_ms))
+        fi
+		echo "    [PASS]"
+		echo "    Generated $expected_num_ids in IDs in $duration_ms ms ($rate IDs/sec)"
+		tests_passed=$((tests_passed + 1))
 	fi
 }
 
-test_single_proc_single_id() {
-	echo "Running test: single proc single id"
+test_proc_genid() {
+	num_proc=$1
+	num_ids_per_proc=$2
+	test_name=$3
 
 	# Clean up previous counter files
 	rm -f .counter .counter.lock output.txt sorted.txt expected.txt mismatch.txt
 	# Initialize counter with 00000
 	echo 0 > .counter
 
-	# Call genid once on one process
-	id=$(genid)
-
-	# Check id is valid
-	if [[ "$id" == "00001" ]]; then
-		echo " - PASS"
-		((tests_passed++))
-	else
-		echo " - FAIL: - got $id"
-		((tests_failed++))
-	fi
-	return 0
-}
-
-test_single_proc_many_ids() {
-	echo "Running test: single proc many ids"
-
-	# Clean up previous counter files
-	rm -f .counter .counter.lock output.txt sorted.txt expected.txt mismatch.txt
-	# Initialize counter with 00000
-	echo 0 > .counter
-
-	# Generate 1000 ids with one process
-	for i in {1..1000}; do
-		genid >> output.txt
-	done
-
-	verify_genid_output 1000
-	return 0
-}
-
-test_many_proc_single_id() {
-	echo "Running test: many proc single id"
-
-	# Clean up previous counter files
-	rm -f .counter .counter.lock output.txt sorted.txt expected.txt mismatch.txt
-	# Initialize counter with 00000
-	echo 0 > .counter
-
-	# Fork 20 processes
-	for i in {1..20}; do
+	echo "Running test: $test_name"
+	start_time=$(date +%s%3N)
+	for ((i = 1; i <= num_proc; i++)); do
 		(
-			genid >> output.txt
-		) &
-	done
-	wait
-
-	verify_genid_output 20
-	return 0
-}
-
-test_many_proc_many_id() {
-	echo "Running test: many proc many id"
-
-	# Clean up previous counter files
-	rm -f .counter .counter.lock output.txt sorted.txt expected.txt mismatch.txt
-	# Initialize counter with 00000
-	echo 0 > .counter
-
-	# Fork 20 processes
-	for i in {1..20}; do
-		(
-			for j in {1..200}; do
+			for ((j = 1; j <= num_ids_per_proc; j++)); do
 				genid >> output.txt
 			done
 		) &
 	done
 	wait
+	end_time=$(date +%s%3N)
+	duration_ms=$((end_time - start_time))
 
-	verify_genid_output 4000
+	total_expected_ids=$((num_proc * num_ids_per_proc))
+	verify_genid_output "$total_expected_ids" "$duration_ms"
+
 	return 0
 }
 
@@ -122,10 +77,10 @@ run_tests() {
 	# Load function
 	source ./genid.sh
 	
-	test_single_proc_single_id
-	test_single_proc_many_ids
-	test_many_proc_single_id
-	test_many_proc_many_id
+	test_proc_genid 1 1 single_proc_single_id
+	test_proc_genid 1 1000 single_proc_many_id
+	test_proc_genid 50 1 many_proc_single_id
+	test_proc_genid 50 100 many_proc_many_id
 
 	total_tests=$((tests_passed + tests_failed))
 
