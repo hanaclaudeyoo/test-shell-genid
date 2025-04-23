@@ -54,6 +54,7 @@ test_single_proc_single_id() {
 		echo " - FAIL: - got $id"
 		((tests_failed++))
 	fi
+	return 0
 }
 
 test_single_proc_many_ids() {
@@ -70,6 +71,7 @@ test_single_proc_many_ids() {
 	done
 
 	verify_genid_output 1000
+	return 0
 }
 
 test_many_proc_single_id() {
@@ -89,6 +91,7 @@ test_many_proc_single_id() {
 	wait
 
 	verify_genid_output 20
+	return 0
 }
 
 test_many_proc_many_id() {
@@ -110,9 +113,10 @@ test_many_proc_many_id() {
 	wait
 
 	verify_genid_output 4000
+	return 0
 }
 
-main() {
+run_tests() {
 	echo "=== testid.sh ==="
 	
 	# Load function
@@ -133,6 +137,12 @@ main() {
 	# Clean up files before exit
 	rm -f .counter .counter.lock output.txt sorted.txt expected.txt mismatch.txt
 	
-	# Return exit code 0 if all tests passed, 1 otherwise
-	[[ $tests_failed -eq 0 ]]
+	# Exit with code 0 if all tests passed, 1 otherwise
+	if [[ $tests_failed -eq 0 ]]; then
+		exit 0
+	else
+		exit 1
+	fi
 }
+
+run_tests
