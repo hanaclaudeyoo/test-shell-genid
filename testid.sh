@@ -4,25 +4,27 @@ set -euo pipefail
 tests_passed=0
 tests_failed=0
 
-# Helper function to get current time
+# Helper function to get current time (flexibe)
 get_time() {
-  out=$(date +%s%3N 2>/dev/null)
-  if [[ "$out" =~ ^[0-9]+$ ]]; then
-    echo "$out"
-    return
-  fi
+	# Use GNU date if available
+	out=$(date +%s%3N 2>/dev/null)
+	if [[ "$out" =~ ^[0-9]+$ ]]; then
+		echo "$out"
+		return
+	fi
+	
+	# Use perl if available
+	if command -v perl &>/dev/null && perl -e 'use Time::HiRes' &>/dev/null; then
+		perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000'
+		return
+	fi
 
-  if command -v perl &>/dev/null && perl -e 'use Time::HiRes' &>/dev/null; then
-    perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000'
-    return
-  fi
-
-  # fallback: epoch seconds * 1000
-  echo "$(( $(date +%s) * 1000 ))"
+	# Fallback on seconds (low-res)
+	echo "$(( $(date +%s) * 1000 ))"
 }
 
 # Helper function to verify genid output from output.txt
-#	- Takes 1 arg: expected number of ids
+#	- Takes 2 args: expected number of ids, duration (in ms) taken to generate IDs
 verify_genid_output() {
 	expected_num_ids=$1
 	duration_ms=$2
@@ -48,17 +50,20 @@ verify_genid_output() {
 		cat mismatch.txt
         tests_failed=$((tests_failed + 1))
 	else
+		# Calculate throughput rate
         if [[ $duration_ms -eq 0 ]]; then
             rate="N/A (duration 0)"
         else
             rate=$((expected_num_ids * 1000 / duration_ms))
         fi
 		echo "    [PASS]"
-		echo "    Generated $expected_num_ids in IDs in $duration_ms ms ($rate IDs/sec)"
+		echo "    Generated $expected_num_ids IDs in $duration_ms ms ($rate IDs/sec)"
 		tests_passed=$((tests_passed + 1))
 	fi
 }
 
+# Helper function to call genid and pipe the generated values to output.txt
+#	- Takes 3 args: number of processes to run, number of IDs to generate per process, name of test
 test_proc_genid() {
 	num_proc=$1
 	num_ids_per_proc=$2
