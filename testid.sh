@@ -4,6 +4,23 @@ set -euo pipefail
 tests_passed=0
 tests_failed=0
 
+# Helper function to get current time
+get_time() {
+  out=$(date +%s%3N 2>/dev/null)
+  if [[ "$out" =~ ^[0-9]+$ ]]; then
+    echo "$out"
+    return
+  fi
+
+  if command -v perl &>/dev/null && perl -e 'use Time::HiRes' &>/dev/null; then
+    perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000'
+    return
+  fi
+
+  # fallback: epoch seconds * 1000
+  echo "$(( $(date +%s) * 1000 ))"
+}
+
 # Helper function to verify genid output from output.txt
 #	- Takes 1 arg: expected number of ids
 verify_genid_output() {
@@ -53,7 +70,7 @@ test_proc_genid() {
 	echo 0 > .counter
 
 	echo "Running test: $test_name"
-	start_time=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000')
+	start_time=$(get_time)
 	for ((i = 1; i <= num_proc; i++)); do
 		(
 			for ((j = 1; j <= num_ids_per_proc; j++)); do
@@ -62,7 +79,7 @@ test_proc_genid() {
 		) &
 	done
 	wait
-	end_time=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000')
+	end_time=$(get_time)
 	duration_ms=$((end_time - start_time))
 
 	total_expected_ids=$((num_proc * num_ids_per_proc))
@@ -81,6 +98,10 @@ run_tests() {
 	test_proc_genid 1 1000 single_proc_many_id
 	test_proc_genid 50 1 many_proc_single_id
 	test_proc_genid 50 100 many_proc_many_id
+	test_proc_genid 50 100 many_proc_many_id
+	test_proc_genid 50 100 many_proc_many_id
+	test_proc_genid 50 100 many_proc_many_id
+	test_proc_genid 50 100 many_proc_many_id # Repeated runs to check performance consistency
 
 	total_tests=$((tests_passed + tests_failed))
 
