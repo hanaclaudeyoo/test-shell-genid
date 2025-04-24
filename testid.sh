@@ -53,7 +53,7 @@ test_proc_genid() {
 	echo 0 > .counter
 
 	echo "Running test: $test_name"
-	start_time=$(date +%s%3N)
+	start_time=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000')
 	for ((i = 1; i <= num_proc; i++)); do
 		(
 			for ((j = 1; j <= num_ids_per_proc; j++)); do
@@ -62,7 +62,7 @@ test_proc_genid() {
 		) &
 	done
 	wait
-	end_time=$(date +%s%3N)
+	end_time=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000')
 	duration_ms=$((end_time - start_time))
 
 	total_expected_ids=$((num_proc * num_ids_per_proc))
